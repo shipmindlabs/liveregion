@@ -1,0 +1,25 @@
+{
+  "name": "liveregion",
+  "version": "0.0.0",
+  "description": "Screen-reader announcements for React: a queue that does not merge messages, a repeat that is actually announced, and the two regions a page needs.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "exports": { ".": "./src/index.ts" },
+  "files": ["src", "README.md", "LICENSE"],
+  "peerDependencies": { "react": ">=18" },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "demo": "node example/demo.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.4",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2"
+  },
+  "keywords": ["accessibility", "a11y", "aria-live", "screen-reader", "react", "wcag"]
+}
