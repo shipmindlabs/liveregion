@@ -66,8 +66,12 @@ export function useAnnouncer(options: QueueOptions = {}): UseAnnouncer {
   }, [queue]);
 
   const pump = useCallback(() => {
-    if (timer.current) clearTimeout(timer.current);
+    // A drain is already scheduled: leave it alone. Resetting the timer on
+    // every announce would let a steady stream of messages keep the current
+    // one on screen for ever while the queue starves behind it.
+    if (timer.current !== null) return;
     timer.current = setTimeout(() => {
+      timer.current = null;
       queue.advance();
       paint();
       if (queue.current) pump();
@@ -85,6 +89,10 @@ export function useAnnouncer(options: QueueOptions = {}): UseAnnouncer {
 
   const clear = useCallback(() => {
     queue.clear();
+    if (timer.current !== null) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
     paint();
   }, [paint, queue]);
 
