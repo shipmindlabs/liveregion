@@ -8,9 +8,10 @@
  * message goes to the right one.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Announcer, type Politeness, type QueueOptions } from "./announcer.ts";
+import { Driver } from "./driver.ts";
 
 export type RegionProps = {
   readonly "aria-live": Politeness;
@@ -51,56 +52,37 @@ export type UseAnnouncer = {
 
 export function useAnnouncer(options: QueueOptions = {}): UseAnnouncer {
   const { clearAfterMs, deduplicate } = options;
-  const queue = useMemo(
-    () => new Announcer({ clearAfterMs, deduplicate }),
-    [clearAfterMs, deduplicate],
-  );
   const [polite, setPolite] = useState("");
   const [assertive, setAssertive] = useState("");
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const paint = useCallback(() => {
-    const current = queue.current;
-    setPolite(current?.politeness === "polite" ? current.text : "");
-    setAssertive(current?.politeness === "assertive" ? current.text : "");
-  }, [queue]);
-
-  const pump = useCallback(() => {
-    // A drain is already scheduled: leave it alone. Resetting the timer on
-    // every announce would let a steady stream of messages keep the current
-    // one on screen for ever while the queue starves behind it.
-    if (timer.current !== null) return;
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      queue.advance();
-      paint();
-      if (queue.current) pump();
-    }, queue.clearAfterMs);
-  }, [paint, queue]);
+  const driver = useMemo(
+    () =>
+      new Driver(
+        new Announcer({ clearAfterMs, deduplicate }),
+        (nextPolite, nextAssertive) => {
+          setPolite(nextPolite);
+          setAssertive(nextAssertive);
+        },
+      ),
+    [clearAfterMs, deduplicate],
+  );
 
   const announce = useCallback(
     (message: string, politeness: Politeness = "polite") => {
-      queue.announce(message, politeness);
-      paint();
-      pump();
+      driver.announce(message, politeness);
     },
-    [paint, pump, queue],
+    [driver],
   );
 
   const clear = useCallback(() => {
-    queue.clear();
-    if (timer.current !== null) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
-    paint();
-  }, [paint, queue]);
+    driver.clear();
+  }, [driver]);
 
   useEffect(() => {
     return () => {
-      if (timer.current) clearTimeout(timer.current);
+      driver.clear();
     };
-  }, []);
+  }, [driver]);
 
   return {
     announce,
