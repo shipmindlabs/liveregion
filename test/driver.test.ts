@@ -70,6 +70,39 @@ test("a stream of announces cannot extend the hold on what is showing", (t) => {
   );
 });
 
+// The queue ignores a blank message, so there is nothing for a drain to clear.
+test("a blank announce arms no drain", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { driver, painted, regions } = driverUnderTest();
+
+  driver.announce("  ");
+  const paints = painted.length;
+
+  t.mock.timers.tick(5000);
+  assert.equal(painted.length, paints, "nothing was queued, so nothing fires later");
+  assert.deepEqual(regions(), ["", ""]);
+});
+
+test("a message after a blank announce still gets its full hold", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { driver, regions } = driverUnderTest();
+
+  driver.announce("  ");
+  t.mock.timers.tick(900);
+  driver.announce("Saved");
+  assert.deepEqual(regions(), ["Saved", ""]);
+
+  t.mock.timers.tick(999);
+  assert.deepEqual(
+    regions(),
+    ["Saved", ""],
+    "still painted at 1899 ms: no drain was armed at 0",
+  );
+
+  t.mock.timers.tick(1);
+  assert.deepEqual(regions(), ["", ""], "cleared at 1900 ms, a full hold after it arrived");
+});
+
 test("clear blanks both regions and cancels the armed drain", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const { driver, painted, regions } = driverUnderTest();

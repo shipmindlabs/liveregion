@@ -56,6 +56,10 @@ Both regions are rendered from the start. A region's politeness is read when the
 page loads, not when its text changes, so a single region that switches between
 polite and assertive does not work in several screen readers.
 
+An empty or whitespace-only message is ignored, and ignored completely: it is
+not queued, and it does not start the timer that clears the region. A real
+message announced a moment later still gets its full time on screen.
+
 ## The hiding style
 
 `VISUALLY_HIDDEN` is exported because this is the other common reason an
@@ -97,4 +101,4 @@ npm run typecheck
 
 ## License
 
-MIT
+MIT © [Shipmind Labs](https://shipmindlabs.com)

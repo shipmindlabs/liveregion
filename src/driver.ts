@@ -4,8 +4,8 @@
  *
  * It lives here, and not in a ref inside the hook, because the timing rules are
  * the awkward part — a hold that lasts a full `clearAfterMs`, a drain that a new
- * message cannot push back — and they can be tested with mock timers and a
- * recording `paint` instead of a renderer.
+ * message cannot push back, a blank announce that arms nothing — and they can be
+ * tested with mock timers and a recording `paint` instead of a renderer.
  */
 
 import type { Announcer, Politeness } from "./announcer.ts";
@@ -48,6 +48,11 @@ export class Driver {
   }
 
   #pump(): void {
+    // Nothing is showing, so there is nothing for a drain to clear. The queue
+    // ignores a blank message, and arming a drain for it anyway would cut the
+    // next real message short: it would be cleared when that earlier timer
+    // fires, after a fraction of its own hold.
+    if (!this.#queue.current) return;
     // A drain is already armed: leave it alone. Resetting the timer on every
     // announce would let a steady stream of messages keep the current one on
     // screen for ever while the queue starves behind it.
@@ -56,7 +61,7 @@ export class Driver {
       this.#timer = null;
       this.#queue.advance();
       this.#repaint();
-      if (this.#queue.current) this.#pump();
+      this.#pump();
     }, this.#queue.clearAfterMs);
   }
 }
