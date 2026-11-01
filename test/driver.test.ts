@@ -117,3 +117,50 @@ test("clear blanks both regions and cancels the armed drain", (t) => {
   t.mock.timers.tick(5000);
   assert.equal(painted.length, paints, "a cancelled drain paints nothing later");
 });
+
+// An effect that cleared the timeout but kept the handle left pump() believing
+// a drain was armed, so the region held its text until someone called clear().
+test("a stopped drain is forgotten, so start arms a new one", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { driver, regions } = driverUnderTest();
+
+  driver.announce("A");
+  driver.announce("B", "assertive");
+  driver.stop();
+  driver.start();
+
+  t.mock.timers.tick(1000);
+  assert.deepEqual(regions(), ["", "B"], "the queue moves on after an effect re-run");
+});
+
+test("a stopped driver queues without arming a drain", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { driver, regions } = driverUnderTest();
+
+  driver.announce("A");
+  driver.stop();
+  driver.announce("C");
+
+  t.mock.timers.tick(10000);
+  assert.deepEqual(regions(), ["A", ""], "nothing drains while there is no host");
+
+  driver.start();
+  t.mock.timers.tick(1000);
+  assert.deepEqual(regions(), ["C", ""], "and what arrived in between is not lost");
+});
+
+test("start arms nothing when no message is showing", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { driver, painted, regions } = driverUnderTest();
+
+  driver.start();
+  const paints = painted.length;
+  t.mock.timers.tick(5000);
+  assert.equal(painted.length, paints, "an empty queue needs no drain");
+
+  driver.announce("Saved");
+  t.mock.timers.tick(999);
+  assert.deepEqual(regions(), ["Saved", ""], "so the first message gets its full hold");
+  t.mock.timers.tick(1);
+  assert.deepEqual(regions(), ["", ""]);
+});

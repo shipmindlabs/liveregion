@@ -78,9 +78,14 @@ export function useAnnouncer(options: QueueOptions = {}): UseAnnouncer {
     driver.clear();
   }, [driver]);
 
+  // The effect can run more than once for the same driver — StrictMode remounts,
+  // an <Activity> hidden and shown again, Fast Refresh — so the cleanup has to
+  // leave the driver in a state the next run can resume from, keeping whatever
+  // was announced in between.
   useEffect(() => {
+    driver.start();
     return () => {
-      driver.clear();
+      driver.stop();
     };
   }, [driver]);
 

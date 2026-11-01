@@ -4,8 +4,9 @@
  *
  * It lives here, and not in a ref inside the hook, because the timing rules are
  * the awkward part — a hold that lasts a full `clearAfterMs`, a drain that a new
- * message cannot push back, a blank announce that arms nothing — and they can be
- * tested with mock timers and a recording `paint` instead of a renderer.
+ * message cannot push back, a blank announce that arms nothing, a drain that is
+ * forgotten when it is cancelled — and they can be tested with mock timers and
+ * a recording `paint` instead of a renderer.
  */
 
 import type { Announcer, Politeness } from "./announcer.ts";
@@ -17,6 +18,7 @@ export class Driver {
   #queue: Announcer;
   #paint: Paint;
   #timer: ReturnType<typeof setTimeout> | null = null;
+  #stopped = false;
 
   constructor(queue: Announcer, paint: Paint) {
     this.#queue = queue;
@@ -29,14 +31,37 @@ export class Driver {
     this.#pump();
   }
 
-  /** Drop everything and blank both regions, e.g. on unmount mid-flow. */
+  /** Drop everything and blank both regions. */
   clear(): void {
     this.#queue.clear();
+    this.#cancel();
+    this.#repaint();
+  }
+
+  /**
+   * Cancel the pending drain and arm no further ones until `start`.
+   *
+   * Forgetting the drain is the whole point: a cleanup that only cleared the
+   * timeout left the handle in place, so the next run of the effect saw a drain
+   * that no longer existed and the region kept its text until someone called
+   * `clear`.
+   */
+  stop(): void {
+    this.#cancel();
+    this.#stopped = true;
+  }
+
+  /** Drain again, re-arming a drain only when a message is showing. */
+  start(): void {
+    this.#stopped = false;
+    this.#pump();
+  }
+
+  #cancel(): void {
     if (this.#timer !== null) {
       clearTimeout(this.#timer);
       this.#timer = null;
     }
-    this.#repaint();
   }
 
   #repaint(): void {
@@ -48,6 +73,7 @@ export class Driver {
   }
 
   #pump(): void {
+    if (this.#stopped) return;
     // Nothing is showing, so there is nothing for a drain to clear. The queue
     // ignores a blank message, and arming a drain for it anyway would cut the
     // next real message short: it would be cleared when that earlier timer

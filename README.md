@@ -60,6 +60,11 @@ An empty or whitespace-only message is ignored, and ignored completely: it is
 not queued, and it does not start the timer that clears the region. A real
 message announced a moment later still gets its full time on screen.
 
+The hook's effect can run more than once — StrictMode remounts, an `<Activity>`
+hidden and shown again, Fast Refresh. The cleanup cancels the pending clear and
+the next run arms a fresh one, so the queue keeps moving and anything announced
+in between is still read.
+
 ## The hiding style
 
 `VISUALLY_HIDDEN` is exported because this is the other common reason an
@@ -85,7 +90,7 @@ needs to hear.
 | | |
 |---|---|
 | Core | ordered queue, no merging, repeated messages made distinct, per-message politeness, trimming, clearing |
-| React | `useAnnouncer` with both regions, a timer that drains the queue, cleanup on unmount |
+| React | `useAnnouncer` with both regions, a timer that drains the queue, a drain that survives a re-run of the effect |
 | Not yet | route-change announcements, per-message timing, a debug mode that logs what was announced |
 
 The queue is a plain class with no timers of its own, which is why the awkward
