@@ -8,13 +8,14 @@ import { Announcer } from "../src/index.ts";
 
 const announcer = new Announcer();
 
-// A filter runs twice and returns the same count both times.
+// A filter runs twice and returns the same count both times, and then the
+// payment fails.
 announcer.announce("Filtering");
 announcer.announce("3 results");
 announcer.announce("3 results");
 announcer.announce("Payment declined", "assertive");
 
-console.log("queued, in order:\n");
+console.log("queued, in order within a politeness:\n");
 let step = 1;
 let current = announcer.current;
 while (current) {
@@ -25,6 +26,9 @@ while (current) {
   current = announcer.advance();
 }
 console.log("\n  region cleared\n");
+
+console.log("the assertive message did not wait behind the two counts,");
+console.log("and \"Filtering\" was not cut off to make room for it.\n");
 
 console.log("without queueing, a screen reader would have announced:");
 console.log('  "Payment declined"   — the last write wins, the rest are lost');

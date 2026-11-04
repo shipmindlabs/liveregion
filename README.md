@@ -8,14 +8,17 @@ hardware quirks.
 
 ```console
 $ npm run demo
-queued, in order:
+queued, in order within a politeness:
 
   1. [polite   ] "Filtering"
-  2. [polite   ] "3 results"
-  3. [polite   ] "3 results"  (made distinct so it is read again)
-  4. [assertive] "Payment declined"
+  2. [assertive] "Payment declined"
+  3. [polite   ] "3 results"
+  4. [polite   ] "3 results"  (made distinct so it is read again)
 
   region cleared
+
+the assertive message did not wait behind the two counts,
+and "Filtering" was not cut off to make room for it.
 
 without queueing, a screen reader would have announced:
   "Payment declined"   — the last write wins, the rest are lost
@@ -23,7 +26,8 @@ without queueing, a screen reader would have announced:
 
 **Two messages in one frame become one.** The region's text is replaced, and the
 screen reader announces what it finds when it looks — the second message, never
-the first. So messages are queued and delivered with a gap, in order.
+the first. So messages are queued and delivered with a gap, in order within a
+politeness.
 
 **The same text twice is silence.** Setting a node's text to what it already
 says is not a change. "3 results" after "3 results" announces nothing, and the
@@ -31,8 +35,12 @@ user concludes the filter did not run. A repeat is made distinct with a trailing
 zero-width space: not read out, no effect on layout, and the change is real.
 
 **`assertive` interrupts whatever is being read.** It is for something that has
-gone wrong right now. Using it for *saved successfully* makes an application
-exhausting to use, so politeness is per message and the default is polite.
+gone wrong right now, so a *Payment declined* does not wait a full hold behind
+each queued polite message: it is placed after the last waiting assertive one
+and ahead of every waiting polite one, and the polite ones keep their own order.
+What is already showing stays — a message cut off mid-word is a message nobody
+got. Using `assertive` for *saved successfully* makes an application exhausting
+to use, so politeness is per message and the default is polite.
 
 ## Use
 
@@ -89,7 +97,7 @@ needs to hear.
 
 | | |
 |---|---|
-| Core | ordered queue, no merging, repeated messages made distinct, per-message politeness, trimming, clearing |
+| Core | ordered queue, no merging, repeated messages made distinct, per-message politeness, assertive ahead of the waiting polite ones, trimming, clearing |
 | React | `useAnnouncer` with both regions, a timer that drains the queue, a drain that survives a re-run of the effect |
 | Not yet | route-change announcements, per-message timing, a debug mode that logs what was announced |
 

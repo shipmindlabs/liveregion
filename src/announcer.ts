@@ -48,9 +48,11 @@ export const DEFAULT_CLEAR_MS = 1000;
 /**
  * A queue that hands out one announcement at a time.
  *
- * Messages are not merged and not dropped: each one is delivered, in order,
- * with a gap between them, because that is the only way a screen reader reads
- * all of them.
+ * Messages are not merged and not dropped: each one is delivered, in order
+ * within a politeness, with a gap between them, because that is the only way a
+ * screen reader reads all of them. An assertive message describes something
+ * that has gone wrong now, so it waits ahead of the polite ones rather than
+ * behind them.
  */
 export class Announcer {
   #queue: Announcement[] = [];
@@ -83,17 +85,30 @@ export class Announcer {
    * Queue a message. An empty or whitespace-only message is ignored rather than
    * queued: clearing the region is what `advance` does, and announcing nothing
    * is not a thing a user can hear.
+   *
+   * An assertive message goes after the last waiting assertive one and ahead of
+   * every waiting polite one; polite messages stay first-in-first-out. What is
+   * already showing is never replaced, because a message cut off mid-word is a
+   * message the user did not get.
    */
   announce(message: string, politeness: Politeness = "polite"): this {
     const trimmed = message.trim();
     if (trimmed === "") return this;
 
-    this.#queue.push({
+    const announcement: Announcement = {
       message: trimmed,
       politeness,
       text: this.#distinct(trimmed, politeness),
       id: ++this.#counter,
-    });
+    };
+
+    if (politeness === "assertive") {
+      const firstPolite = this.#queue.findIndex((a) => a.politeness === "polite");
+      this.#queue.splice(firstPolite === -1 ? this.#queue.length : firstPolite, 0, announcement);
+    } else {
+      this.#queue.push(announcement);
+    }
+
     if (!this.#current) this.advance();
     return this;
   }
@@ -125,7 +140,7 @@ export class Announcer {
   #distinct(message: string, politeness: Politeness): string {
     if (!this.#options.deduplicate) return message;
     const previous = this.#lastText.get(politeness);
-    const text = previous === message ? message + "​" : message;
+    const text = previous === message ? message + "\u200b" : message;
     this.#lastText.set(politeness, text);
     return text;
   }

@@ -34,7 +34,7 @@ test("the same message twice is made distinct so it is announced twice", () => {
   assert.equal(first.message, second.message, "the message a user hears is the same");
   assert.notEqual(first.text, second.text, "the text written to the DOM must differ");
   // The distinguishing character is not read out and does not affect layout.
-  assert.equal(second.text.replace(/​/g, ""), "3 results");
+  assert.equal(second.text.replace(/\u200b/g, ""), "3 results");
 });
 
 test("deduplication can be switched off for a caller who handles it", () => {
@@ -52,6 +52,33 @@ test("politeness levels do not interfere with each other's repeats", () => {
   // Different regions, so neither needs distinguishing from the other.
   assert.equal(announcer.current?.text, "Busy");
   assert.equal(announcer.waiting[0]?.text, "Busy");
+});
+
+// Assertive is for what has gone wrong right now, so it must not wait a full
+// hold behind each queued polite message.
+test("an assertive message waits ahead of the polite ones", () => {
+  const announcer = new Announcer();
+  announcer.announce("A").announce("B").announce("C");
+  announcer.announce("X", "assertive").announce("Y", "assertive");
+
+  assert.equal(announcer.current?.message, "A", "what is showing is never replaced");
+  assert.deepEqual(
+    announcer.waiting.map((a) => a.message),
+    ["X", "Y", "B", "C"],
+    "assertive in arrival order, then the polite ones in theirs",
+  );
+});
+
+test("overtaking does not undo what made a repeated message distinct", () => {
+  const announcer = new Announcer();
+  announcer.announce("3 results");
+  announcer.announce("3 results");
+  announcer.announce("X", "assertive");
+
+  assert.deepEqual(
+    announcer.waiting.map((a) => a.text),
+    ["X", "3 results\u200b"],
+  );
 });
 
 test("an empty message is ignored rather than queued", () => {
