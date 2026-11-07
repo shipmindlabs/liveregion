@@ -73,6 +73,39 @@ hidden and shown again, Fast Refresh. The cleanup cancels the pending clear and
 the next run arms a fresh one, so the queue keeps moving and anything announced
 in between is still read.
 
+## One pair of regions per page
+
+The one-at-a-time guarantee holds within one queue. Two components that each
+call `useAnnouncer` have two queues and two pairs of regions, so two messages
+can change regions in the same frame and whether both are read is up to the
+screen reader. For anything larger than one component, put the queue above the
+messages:
+
+```tsx
+function App() {
+  return (
+    <AnnouncerProvider>
+      <Filters />
+      <Checkout />
+    </AnnouncerProvider>
+  );
+}
+
+function Filters() {
+  const { announce } = useAnnounce();
+  return <button onClick={() => announce(`${count} results`)}>Filter</button>;
+}
+```
+
+The provider renders its children and then the two regions, and `useAnnounce`
+gives any descendant `announce` and `clear`. Calling it with no provider above
+throws rather than announcing into nothing.
+
+A provider inside another renders only its children: its consumers share the
+outer queue and the options passed to the inner one are ignored. A layout that
+provides and a route that provides again is the usual way a page ends up with
+two queues, and this is the way it does not.
+
 ## The hiding style
 
 `VISUALLY_HIDDEN` is exported because this is the other common reason an
@@ -98,7 +131,7 @@ needs to hear.
 | | |
 |---|---|
 | Core | ordered queue, no merging, repeated messages made distinct, per-message politeness, assertive ahead of the waiting polite ones, trimming, clearing |
-| React | `useAnnouncer` with both regions, a timer that drains the queue, a drain that survives a re-run of the effect |
+| React | `useAnnouncer` with both regions, `AnnouncerProvider` and `useAnnounce` for one queue per page, a timer that drains the queue, a drain that survives a re-run of the effect |
 | Not yet | route-change announcements, per-message timing, a debug mode that logs what was announced |
 
 The queue is a plain class with no timers of its own, which is why the awkward

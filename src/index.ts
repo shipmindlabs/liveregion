@@ -17,3 +17,10 @@ export {
   type RegionProps,
   type UseAnnouncer,
 } from "./useAnnouncer.ts";
+
+export {
+  AnnouncerProvider,
+  useAnnounce,
+  type AnnouncerProviderProps,
+  type UseAnnounce,
+} from "./provider.ts";
