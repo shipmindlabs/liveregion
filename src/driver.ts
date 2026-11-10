@@ -5,8 +5,9 @@
  * It lives here, and not in a ref inside the hook, because the timing rules are
  * the awkward part — a hold that lasts a full `clearAfterMs`, a drain that a new
  * message cannot push back, a blank announce that arms nothing, a drain that is
- * forgotten when it is cancelled — and they can be tested with mock timers and
- * a recording `paint` instead of a renderer.
+ * forgotten when it is cancelled, a changed hold that leaves the running one
+ * alone — and they can be tested with mock timers and a recording `paint`
+ * instead of a renderer.
  */
 
 import type { Announcer, Politeness } from "./announcer.ts";
@@ -29,6 +30,19 @@ export class Driver {
     this.#queue.announce(message, politeness);
     this.#repaint();
     this.#pump();
+  }
+
+  /**
+   * Change the hold, from the next drain this arms onwards.
+   *
+   * The drain already armed keeps the length it was armed with. Re-arming it
+   * would either cut the showing message short or hand it a second full hold,
+   * and a host that changed an option on a later render asked for neither. This
+   * is also why the option does not need a second queue: the one that is
+   * running keeps everything that was announced into it.
+   */
+  setClearAfterMs(clearAfterMs: number): void {
+    this.#queue.setClearAfterMs(clearAfterMs);
   }
 
   /** Drop everything and blank both regions. */

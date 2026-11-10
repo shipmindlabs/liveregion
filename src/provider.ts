@@ -19,7 +19,12 @@ import {
   type ReactNode,
 } from "react";
 
-import { Announcer, type Politeness, type QueueOptions } from "./announcer.ts";
+import {
+  Announcer,
+  DEFAULT_CLEAR_MS,
+  type Politeness,
+  type QueueOptions,
+} from "./announcer.ts";
 import { Driver } from "./driver.ts";
 import { VISUALLY_HIDDEN, type RegionProps } from "./useAnnouncer.ts";
 
@@ -76,6 +81,12 @@ export function AnnouncerProvider({
         },
       ),
   );
+
+  // As in the hook: a changed hold reaches the one queue and applies from the
+  // next drain it arms.
+  useEffect(() => {
+    driver.setClearAfterMs(clearAfterMs ?? DEFAULT_CLEAR_MS);
+  }, [driver, clearAfterMs]);
 
   const nested = outer !== null;
 

@@ -164,3 +164,38 @@ test("start arms nothing when no message is showing", (t) => {
   t.mock.timers.tick(1);
   assert.deepEqual(regions(), ["", ""]);
 });
+
+// A changed option used to build a second queue beside this one, and the two
+// drained into the same regions. One queue, a new hold from the next drain on.
+test("a changed clearAfterMs keeps the queue and applies from the next drain", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { driver, painted, regions } = driverUnderTest();
+
+  driver.announce("A");
+  driver.announce("B");
+  driver.announce("C");
+
+  t.mock.timers.tick(500);
+  driver.setClearAfterMs(3000);
+  assert.deepEqual(regions(), ["A", ""]);
+
+  t.mock.timers.tick(499);
+  assert.deepEqual(regions(), ["A", ""], "the drain already armed keeps its length");
+  t.mock.timers.tick(1);
+  assert.deepEqual(regions(), ["B", ""], "so A is replaced at 1000 ms");
+
+  t.mock.timers.tick(2999);
+  assert.deepEqual(regions(), ["B", ""]);
+  t.mock.timers.tick(1);
+  assert.deepEqual(regions(), ["C", ""], "and B holds the new 3000 ms, until 4000");
+
+  t.mock.timers.tick(2999);
+  assert.deepEqual(regions(), ["C", ""]);
+  t.mock.timers.tick(1);
+  assert.deepEqual(regions(), ["", ""], "as does C, until 7000");
+
+  const shown = painted
+    .map(([polite]) => polite)
+    .filter((text, index, all) => text !== all[index - 1]);
+  assert.deepEqual(shown, ["A", "B", "C", ""], "all three painted once each, in order");
+});

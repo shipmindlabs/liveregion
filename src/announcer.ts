@@ -39,6 +39,10 @@ export type QueueOptions = {
   /**
    * Make a repeated message distinct so it is announced again. On by default,
    * because a filter that returns "3 results" twice must say so twice.
+   *
+   * Read when the queue is created and not afterwards. The React binding keeps
+   * one queue for the life of the component, so changing this on a later render
+   * has no effect on what is already queued or on what is announced next.
    */
   readonly deduplicate?: boolean;
 };
@@ -70,6 +74,16 @@ export class Announcer {
 
   get clearAfterMs(): number {
     return this.#options.clearAfterMs;
+  }
+
+  /**
+   * Change the hold for messages drained from now on, so a changed option does
+   * not need a second queue. The host owns the timers, so a hold that is
+   * already running is the host's to finish.
+   */
+  setClearAfterMs(clearAfterMs: number): this {
+    this.#options = { ...this.#options, clearAfterMs };
+    return this;
   }
 
   /** What the region should currently contain, or null for empty. */

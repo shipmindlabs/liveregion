@@ -73,6 +73,12 @@ hidden and shown again, Fast Refresh. The cleanup cancels the pending clear and
 the next run arms a fresh one, so the queue keeps moving and anything announced
 in between is still read.
 
+There is one queue for the life of the component, so a changed option does not
+build a second one behind the first: a new `clearAfterMs` applies from the next
+message the queue drains, and the hold already running keeps the length it
+started with rather than being cut short. `deduplicate` is read once, when the
+queue is created.
+
 ## One pair of regions per page
 
 The one-at-a-time guarantee holds within one queue. Two components that each
@@ -131,7 +137,7 @@ needs to hear.
 | | |
 |---|---|
 | Core | ordered queue, no merging, repeated messages made distinct, per-message politeness, assertive ahead of the waiting polite ones, trimming, clearing |
-| React | `useAnnouncer` with both regions, `AnnouncerProvider` and `useAnnounce` for one queue per page, a timer that drains the queue, a drain that survives a re-run of the effect |
+| React | `useAnnouncer` with both regions, `AnnouncerProvider` and `useAnnounce` for one queue per page, a timer that drains the queue, a drain that survives a re-run of the effect, one queue across a changed option |
 | Not yet | route-change announcements, per-message timing, a debug mode that logs what was announced |
 
 The queue is a plain class with no timers of its own, which is why the awkward

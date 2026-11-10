@@ -8,9 +8,14 @@
  * message goes to the right one.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { Announcer, type Politeness, type QueueOptions } from "./announcer.ts";
+import {
+  Announcer,
+  DEFAULT_CLEAR_MS,
+  type Politeness,
+  type QueueOptions,
+} from "./announcer.ts";
 import { Driver } from "./driver.ts";
 
 export type RegionProps = {
@@ -55,7 +60,11 @@ export function useAnnouncer(options: QueueOptions = {}): UseAnnouncer {
   const [polite, setPolite] = useState("");
   const [assertive, setAssertive] = useState("");
 
-  const driver = useMemo(
+  // One driver for the life of the component. A `useMemo` keyed on the options
+  // was wrong twice over: a changed option built a second queue while the first
+  // one's armed drain went on painting into these same regions, and React is
+  // allowed to throw a memo away and rebuild it for reasons of its own.
+  const [driver] = useState(
     () =>
       new Driver(
         new Announcer({ clearAfterMs, deduplicate }),
@@ -64,8 +73,14 @@ export function useAnnouncer(options: QueueOptions = {}): UseAnnouncer {
           setAssertive(nextAssertive);
         },
       ),
-    [clearAfterMs, deduplicate],
   );
+
+  // A changed hold applies from the next drain the queue arms; the one already
+  // running keeps its length, because re-arming it would cut the showing
+  // message short.
+  useEffect(() => {
+    driver.setClearAfterMs(clearAfterMs ?? DEFAULT_CLEAR_MS);
+  }, [driver, clearAfterMs]);
 
   const announce = useCallback(
     (message: string, politeness: Politeness = "polite") => {
