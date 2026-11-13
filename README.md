@@ -79,6 +79,13 @@ message the queue drains, and the hold already running keeps the length it
 started with rather than being cut short. `deduplicate` is read once, when the
 queue is created.
 
+A `clearAfterMs` a timer cannot keep is a `RangeError` naming the option and the
+value, at the point the value is given. `NaN`, zero and negative delays reach
+`setTimeout` as zero, and anything above 2147483647 ms overflows and fires at
+once — which is how an `Infinity` written to mean *never clear* empties the
+region before anyone has read it. The accepted range is a finite 1 to
+2147483647, exported as `MAX_CLEAR_MS`.
+
 ## One pair of regions per page
 
 The one-at-a-time guarantee holds within one queue. Two components that each
@@ -136,7 +143,7 @@ needs to hear.
 
 | | |
 |---|---|
-| Core | ordered queue, no merging, repeated messages made distinct, per-message politeness, assertive ahead of the waiting polite ones, trimming, clearing |
+| Core | ordered queue, no merging, repeated messages made distinct, per-message politeness, assertive ahead of the waiting polite ones, trimming, clearing, a hold checked against what a timer can keep |
 | React | `useAnnouncer` with both regions, `AnnouncerProvider` and `useAnnounce` for one queue per page, a timer that drains the queue, a drain that survives a re-run of the effect, one queue across a changed option |
 | Not yet | route-change announcements, per-message timing, a debug mode that logs what was announced |
 

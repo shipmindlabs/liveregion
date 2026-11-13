@@ -40,6 +40,9 @@ export class Driver {
    * and a host that changed an option on a later render asked for neither. This
    * is also why the option does not need a second queue: the one that is
    * running keeps everything that was announced into it.
+   *
+   * A hold no timer can keep is a `RangeError` from the queue, before anything
+   * here changes.
    */
   setClearAfterMs(clearAfterMs: number): void {
     this.#queue.setClearAfterMs(clearAfterMs);

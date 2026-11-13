@@ -34,6 +34,9 @@ export type QueueOptions = {
    * How long a message stays in the region before it is cleared. Too short and
    * a slow reader misses it; too long and stale text is read when the user
    * navigates back to the region.
+   *
+   * A finite number of milliseconds from 1 to `MAX_CLEAR_MS`; anything else is
+   * a `RangeError`.
    */
   readonly clearAfterMs?: number;
   /**
@@ -48,6 +51,30 @@ export type QueueOptions = {
 };
 
 export const DEFAULT_CLEAR_MS = 1000;
+
+/**
+ * The longest hold a timer can keep: `setTimeout` holds its delay in a signed
+ * 32-bit integer of milliseconds.
+ */
+export const MAX_CLEAR_MS = 2_147_483_647;
+
+/**
+ * Refuse a hold no timer can keep.
+ *
+ * `NaN`, zero and negative delays reach `setTimeout` as zero, and a delay above
+ * `MAX_CLEAR_MS` overflows and fires at once — so `Infinity`, written to mean
+ * "never clear", empties the region before a reader gets to it. Each of them
+ * looks like a working option and fails where it is hardest to see, which is
+ * why the value is refused where it is given rather than where it is used.
+ */
+function checkClearAfterMs(clearAfterMs: number): number {
+  if (!Number.isFinite(clearAfterMs) || clearAfterMs < 1 || clearAfterMs > MAX_CLEAR_MS) {
+    throw new RangeError(
+      `clearAfterMs must be a finite number of milliseconds from 1 to ${MAX_CLEAR_MS}, not ${clearAfterMs}`,
+    );
+  }
+  return clearAfterMs;
+}
 
 /**
  * A queue that hands out one announcement at a time.
@@ -67,7 +94,7 @@ export class Announcer {
 
   constructor(options: QueueOptions = {}) {
     this.#options = {
-      clearAfterMs: options.clearAfterMs ?? DEFAULT_CLEAR_MS,
+      clearAfterMs: checkClearAfterMs(options.clearAfterMs ?? DEFAULT_CLEAR_MS),
       deduplicate: options.deduplicate ?? true,
     };
   }
@@ -80,9 +107,12 @@ export class Announcer {
    * Change the hold for messages drained from now on, so a changed option does
    * not need a second queue. The host owns the timers, so a hold that is
    * already running is the host's to finish.
+   *
+   * A hold no timer can keep is a `RangeError`, and the one in use is left as
+   * it was.
    */
   setClearAfterMs(clearAfterMs: number): this {
-    this.#options = { ...this.#options, clearAfterMs };
+    this.#options = { ...this.#options, clearAfterMs: checkClearAfterMs(clearAfterMs) };
     return this;
   }
 

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { Announcer, useAnnouncer, VISUALLY_HIDDEN } from "../src/index.ts";
+import { Announcer, MAX_CLEAR_MS, useAnnouncer, VISUALLY_HIDDEN } from "../src/index.ts";
 
 // Two messages written in the same frame become one: the region's text is
 // replaced, and the reader announces what it finds, which is the second.
@@ -109,6 +109,42 @@ test("each announcement carries its own politeness", () => {
 
   assert.equal(announcer.current?.politeness, "polite");
   assert.equal(announcer.waiting[0]?.politeness, "assertive");
+});
+
+// NaN, zero and negative delays reach setTimeout as zero, and a delay above
+// 2^31-1 overflows and fires at once - so Infinity, written to mean "never
+// clear", would empty the region before a reader gets to it.
+test("a hold no timer can keep is refused, naming the option and the value", () => {
+  for (const clearAfterMs of [NaN, 0, -1, Infinity, 2 ** 31]) {
+    assert.throws(
+      () => new Announcer({ clearAfterMs }),
+      (error: unknown) =>
+        error instanceof RangeError &&
+        error.message.includes("clearAfterMs") &&
+        error.message.includes(String(clearAfterMs)),
+      `${clearAfterMs} ms is not a hold`,
+    );
+  }
+});
+
+test("the holds a timer can keep are accepted, up to the edge", () => {
+  assert.equal(new Announcer({ clearAfterMs: 1 }).clearAfterMs, 1);
+  assert.equal(new Announcer({ clearAfterMs: 2 ** 31 - 1 }).clearAfterMs, MAX_CLEAR_MS);
+});
+
+test("a refused hold leaves the one in use alone", () => {
+  const announcer = new Announcer({ clearAfterMs: 50 });
+  assert.throws(() => announcer.setClearAfterMs(0), RangeError);
+  assert.equal(announcer.clearAfterMs, 50);
+});
+
+test("the hook refuses an impossible hold at render", () => {
+  function Announcements() {
+    useAnnouncer({ clearAfterMs: NaN });
+    return null;
+  }
+
+  assert.throws(() => renderToStaticMarkup(createElement(Announcements)), RangeError);
 });
 
 // A region's politeness is read when the page loads, not when its text changes,
