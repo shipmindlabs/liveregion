@@ -37,6 +37,37 @@ test("each message holds its region for a full clearAfterMs", (t) => {
   assert.deepEqual(regions(), ["", ""], "a drained queue leaves both regions blank");
 });
 
+// One hold does not fit both "Saved" and a three-sentence error, so a message
+// may bring its own and the next one still gets the queue's.
+test("a message with its own hold keeps the region for exactly that long", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { driver, regions } = driverUnderTest();
+
+  driver.announce("The card was declined. Try another. Nothing was charged.", {
+    holdMs: 3000,
+  });
+  driver.announce("Saved");
+
+  t.mock.timers.tick(2999);
+  assert.deepEqual(
+    regions(),
+    ["The card was declined. Try another. Nothing was charged.", ""],
+    "its own 3000 ms, not the queue's 1000",
+  );
+
+  t.mock.timers.tick(1);
+  assert.deepEqual(regions(), ["Saved", ""], "replaced at 3000 ms");
+
+  t.mock.timers.tick(999);
+  assert.deepEqual(regions(), ["Saved", ""]);
+  t.mock.timers.tick(1);
+  assert.deepEqual(
+    regions(),
+    ["", ""],
+    "and a message with no own hold is cleared at 4000, after the queue's hold",
+  );
+});
+
 // Resetting the timer on every announce would let a steady stream of messages
 // keep the current one on screen for ever while the queue starves behind it.
 test("a stream of announces cannot extend the hold on what is showing", (t) => {

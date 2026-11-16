@@ -7,6 +7,7 @@ export {
   Announcer,
   DEFAULT_CLEAR_MS,
   MAX_CLEAR_MS,
+  type AnnounceOptions,
   type Announcement,
   type Politeness,
   type QueueOptions,

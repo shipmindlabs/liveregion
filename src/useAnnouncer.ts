@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Announcer,
   DEFAULT_CLEAR_MS,
+  type AnnounceOptions,
   type Politeness,
   type QueueOptions,
 } from "./announcer.ts";
@@ -47,7 +48,7 @@ export const VISUALLY_HIDDEN: Readonly<Record<string, string | number>> = {
 };
 
 export type UseAnnouncer = {
-  announce(message: string, politeness?: Politeness): void;
+  announce(message: string, options?: Politeness | AnnounceOptions): void;
   clear(): void;
   /** Spread onto the polite region element. */
   readonly politeProps: RegionProps;
@@ -83,8 +84,8 @@ export function useAnnouncer(options: QueueOptions = {}): UseAnnouncer {
   }, [driver, clearAfterMs]);
 
   const announce = useCallback(
-    (message: string, politeness: Politeness = "polite") => {
-      driver.announce(message, politeness);
+    (message: string, announceOptions?: Politeness | AnnounceOptions) => {
+      driver.announce(message, announceOptions);
     },
     [driver],
   );

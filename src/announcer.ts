@@ -27,6 +27,21 @@ export type Announcement = {
   /** Distinct text for a repeated message; see `deduplicate`. */
   readonly text: string;
   readonly id: number;
+  /** This message's own hold, or undefined for the queue's `clearAfterMs`. */
+  readonly holdMs?: number;
+};
+
+export type AnnounceOptions = {
+  readonly politeness?: Politeness;
+  /**
+   * How long this one message stays in the region, instead of the queue's
+   * `clearAfterMs`. One hold does not fit both "Saved" and a three-sentence
+   * error.
+   *
+   * Bounded like the queue default: a finite number of milliseconds from 1 to
+   * `MAX_CLEAR_MS`; anything else is a `RangeError`.
+   */
+  readonly holdMs?: number;
 };
 
 export type QueueOptions = {
@@ -59,7 +74,8 @@ export const DEFAULT_CLEAR_MS = 1000;
 export const MAX_CLEAR_MS = 2_147_483_647;
 
 /**
- * Refuse a hold no timer can keep.
+ * Refuse a hold no timer can keep, whether it is the queue's default or one
+ * message's own.
  *
  * `NaN`, zero and negative delays reach `setTimeout` as zero, and a delay above
  * `MAX_CLEAR_MS` overflows and fires at once — so `Infinity`, written to mean
@@ -67,13 +83,13 @@ export const MAX_CLEAR_MS = 2_147_483_647;
  * looks like a working option and fails where it is hardest to see, which is
  * why the value is refused where it is given rather than where it is used.
  */
-function checkClearAfterMs(clearAfterMs: number): number {
-  if (!Number.isFinite(clearAfterMs) || clearAfterMs < 1 || clearAfterMs > MAX_CLEAR_MS) {
+function checkHold(option: string, ms: number): number {
+  if (!Number.isFinite(ms) || ms < 1 || ms > MAX_CLEAR_MS) {
     throw new RangeError(
-      `clearAfterMs must be a finite number of milliseconds from 1 to ${MAX_CLEAR_MS}, not ${clearAfterMs}`,
+      `${option} must be a finite number of milliseconds from 1 to ${MAX_CLEAR_MS}, not ${ms}`,
     );
   }
-  return clearAfterMs;
+  return ms;
 }
 
 /**
@@ -94,7 +110,7 @@ export class Announcer {
 
   constructor(options: QueueOptions = {}) {
     this.#options = {
-      clearAfterMs: checkClearAfterMs(options.clearAfterMs ?? DEFAULT_CLEAR_MS),
+      clearAfterMs: checkHold("clearAfterMs", options.clearAfterMs ?? DEFAULT_CLEAR_MS),
       deduplicate: options.deduplicate ?? true,
     };
   }
@@ -112,7 +128,10 @@ export class Announcer {
    * it was.
    */
   setClearAfterMs(clearAfterMs: number): this {
-    this.#options = { ...this.#options, clearAfterMs: checkClearAfterMs(clearAfterMs) };
+    this.#options = {
+      ...this.#options,
+      clearAfterMs: checkHold("clearAfterMs", clearAfterMs),
+    };
     return this;
   }
 
@@ -130,12 +149,22 @@ export class Announcer {
    * queued: clearing the region is what `advance` does, and announcing nothing
    * is not a thing a user can hear.
    *
+   * The second argument is a politeness, or an object carrying a politeness and
+   * a `holdMs` for this message alone — bounded like the queue default, and
+   * refused here rather than at the timer.
+   *
    * An assertive message goes after the last waiting assertive one and ahead of
    * every waiting polite one; polite messages stay first-in-first-out. What is
    * already showing is never replaced, because a message cut off mid-word is a
    * message the user did not get.
    */
-  announce(message: string, politeness: Politeness = "polite"): this {
+  announce(message: string, options: Politeness | AnnounceOptions = {}): this {
+    const settings: AnnounceOptions =
+      typeof options === "string" ? { politeness: options } : options;
+    const politeness = settings.politeness ?? "polite";
+    const holdMs =
+      settings.holdMs === undefined ? undefined : checkHold("holdMs", settings.holdMs);
+
     const trimmed = message.trim();
     if (trimmed === "") return this;
 
@@ -144,6 +173,7 @@ export class Announcer {
       politeness,
       text: this.#distinct(trimmed, politeness),
       id: ++this.#counter,
+      holdMs,
     };
 
     if (politeness === "assertive") {

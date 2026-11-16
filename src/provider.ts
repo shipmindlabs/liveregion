@@ -22,6 +22,7 @@ import {
 import {
   Announcer,
   DEFAULT_CLEAR_MS,
+  type AnnounceOptions,
   type Politeness,
   type QueueOptions,
 } from "./announcer.ts";
@@ -29,7 +30,7 @@ import { Driver } from "./driver.ts";
 import { VISUALLY_HIDDEN, type RegionProps } from "./useAnnouncer.ts";
 
 export type UseAnnounce = {
-  announce(message: string, politeness?: Politeness): void;
+  announce(message: string, options?: Politeness | AnnounceOptions): void;
   clear(): void;
 };
 
@@ -102,8 +103,8 @@ export function AnnouncerProvider({
 
   const value = useMemo<UseAnnounce>(
     () => ({
-      announce: (message, politeness) => {
-        driver.announce(message, politeness);
+      announce: (message, announceOptions) => {
+        driver.announce(message, announceOptions);
       },
       clear: () => {
         driver.clear();

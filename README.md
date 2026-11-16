@@ -86,6 +86,25 @@ once — which is how an `Infinity` written to mean *never clear* empties the
 region before anyone has read it. The accepted range is a finite 1 to
 2147483647, exported as `MAX_CLEAR_MS`.
 
+## A hold for one message
+
+One hold does not fit both *Saved* and a three-sentence error, so the second
+argument is either a politeness or an object:
+
+```tsx
+announce("Saved");
+announce("Payment declined", "assertive");
+announce("The card was declined. Try another. Nothing was charged.", {
+  politeness: "assertive",
+  holdMs: 4000,
+});
+```
+
+A message with a `holdMs` is held for that long and the next one is held for the
+queue's `clearAfterMs` again. The same bounds and the same `RangeError` apply —
+a finite 1 to `MAX_CLEAR_MS`, refused where the value is given — so a `holdMs`
+of zero throws rather than clearing the region in the same tick.
+
 ## One pair of regions per page
 
 The one-at-a-time guarantee holds within one queue. Two components that each
@@ -143,9 +162,9 @@ needs to hear.
 
 | | |
 |---|---|
-| Core | ordered queue, no merging, repeated messages made distinct, per-message politeness, assertive ahead of the waiting polite ones, trimming, clearing, a hold checked against what a timer can keep |
-| React | `useAnnouncer` with both regions, `AnnouncerProvider` and `useAnnounce` for one queue per page, a timer that drains the queue, a drain that survives a re-run of the effect, one queue across a changed option |
-| Not yet | route-change announcements, per-message timing, a debug mode that logs what was announced |
+| Core | ordered queue, no merging, repeated messages made distinct, per-message politeness, assertive ahead of the waiting polite ones, trimming, clearing, a hold checked against what a timer can keep, a per-message hold within the same bounds |
+| React | `useAnnouncer` with both regions, `AnnouncerProvider` and `useAnnounce` for one queue per page, a timer that drains the queue with each message's own hold, a drain that survives a re-run of the effect, one queue across a changed option |
+| Not yet | route-change announcements, a debug mode that logs what was announced |
 
 The queue is a plain class with no timers of its own, which is why the awkward
 cases are testable without waiting for anything.

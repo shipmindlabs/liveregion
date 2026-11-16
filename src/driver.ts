@@ -3,14 +3,14 @@
  * that drains it.
  *
  * It lives here, and not in a ref inside the hook, because the timing rules are
- * the awkward part — a hold that lasts a full `clearAfterMs`, a drain that a new
- * message cannot push back, a blank announce that arms nothing, a drain that is
- * forgotten when it is cancelled, a changed hold that leaves the running one
- * alone — and they can be tested with mock timers and a recording `paint`
- * instead of a renderer.
+ * the awkward part — a hold that lasts a full `clearAfterMs` or the message's
+ * own `holdMs`, a drain that a new message cannot push back, a blank announce
+ * that arms nothing, a drain that is forgotten when it is cancelled, a changed
+ * hold that leaves the running one alone — and they can be tested with mock
+ * timers and a recording `paint` instead of a renderer.
  */
 
-import type { Announcer, Politeness } from "./announcer.ts";
+import type { AnnounceOptions, Announcer, Politeness } from "./announcer.ts";
 
 /** Called with what each region should contain; empty string means blank. */
 export type Paint = (polite: string, assertive: string) => void;
@@ -26,8 +26,8 @@ export class Driver {
     this.#paint = paint;
   }
 
-  announce(message: string, politeness: Politeness = "polite"): void {
-    this.#queue.announce(message, politeness);
+  announce(message: string, options: Politeness | AnnounceOptions = {}): void {
+    this.#queue.announce(message, options);
     this.#repaint();
     this.#pump();
   }
@@ -95,7 +95,8 @@ export class Driver {
     // ignores a blank message, and arming a drain for it anyway would cut the
     // next real message short: it would be cleared when that earlier timer
     // fires, after a fraction of its own hold.
-    if (!this.#queue.current) return;
+    const current = this.#queue.current;
+    if (!current) return;
     // A drain is already armed: leave it alone. Resetting the timer on every
     // announce would let a steady stream of messages keep the current one on
     // screen for ever while the queue starves behind it.
@@ -105,6 +106,6 @@ export class Driver {
       this.#queue.advance();
       this.#repaint();
       this.#pump();
-    }, this.#queue.clearAfterMs);
+    }, current.holdMs ?? this.#queue.clearAfterMs);
   }
 }

@@ -111,6 +111,59 @@ test("each announcement carries its own politeness", () => {
   assert.equal(announcer.waiting[0]?.politeness, "assertive");
 });
 
+// One hold does not fit both "Saved" and a three-sentence error.
+test("a message can carry its own hold", () => {
+  const announcer = new Announcer();
+  announcer.announce("Saved");
+  announcer.announce("The card was declined. Try another. Nothing was charged.", {
+    holdMs: 4000,
+  });
+  announcer.announce("Payment declined", { politeness: "assertive", holdMs: 2500 });
+
+  assert.equal(announcer.current?.holdMs, undefined, "no own hold means the queue's");
+  assert.deepEqual(
+    announcer.waiting.map((a) => [a.politeness, a.holdMs]),
+    [
+      ["assertive", 2500],
+      ["polite", 4000],
+    ],
+  );
+});
+
+test("the second argument is still a politeness on its own", () => {
+  const announcer = new Announcer();
+  announcer.announce("Payment declined", "assertive");
+
+  assert.equal(announcer.current?.politeness, "assertive");
+  assert.equal(announcer.current?.holdMs, undefined);
+});
+
+// Bounded like the queue default, and refused where it is given: a holdMs of 0
+// would reach setTimeout as zero and clear the region in the same tick.
+test("a per-message hold no timer can keep is refused, naming holdMs", () => {
+  const announcer = new Announcer();
+  for (const holdMs of [NaN, 0, -1, Infinity, 2 ** 31]) {
+    assert.throws(
+      () => announcer.announce("Saved", { holdMs }),
+      (error: unknown) =>
+        error instanceof RangeError &&
+        error.message.includes("holdMs") &&
+        error.message.includes(String(holdMs)),
+      `${holdMs} ms is not a hold`,
+    );
+  }
+  assert.equal(announcer.current, null, "and the refused message was not queued");
+});
+
+test("the per-message holds a timer can keep are accepted, up to the edge", () => {
+  const announcer = new Announcer();
+  announcer.announce("one", { holdMs: 1 });
+  announcer.announce("two", { holdMs: MAX_CLEAR_MS });
+
+  assert.equal(announcer.current?.holdMs, 1);
+  assert.equal(announcer.waiting[0]?.holdMs, MAX_CLEAR_MS);
+});
+
 // NaN, zero and negative delays reach setTimeout as zero, and a delay above
 // 2^31-1 overflows and fires at once - so Infinity, written to mean "never
 // clear", would empty the region before a reader gets to it.
