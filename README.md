@@ -105,6 +105,25 @@ queue's `clearAfterMs` again. The same bounds and the same `RangeError` apply �
 a finite 1 to `MAX_CLEAR_MS`, refused where the value is given — so a `holdMs`
 of zero throws rather than clearing the region in the same tick.
 
+## What was actually announced
+
+The library logs nothing of its own. `onDeliver` is called with each
+announcement at the moment it becomes current — once per message, in the order
+they are delivered, and that is where to log:
+
+```tsx
+<AnnouncerProvider onDeliver={(a) => console.debug(`[${a.politeness}] ${a.message}`)}>
+```
+
+Logging at `announce` instead would name messages a later `clear` drops, and
+name a message queued behind five others long before anyone hears it. What
+`onDeliver` reports is what a screen reader was given.
+
+A callback that throws does not stall the queue: the message is current either
+way, and the error is rethrown from a microtask, so it surfaces to the host
+unhandled rather than to whoever called `announce`. Like `deduplicate`, the
+callback is read once, when the queue is created.
+
 ## One pair of regions per page
 
 The one-at-a-time guarantee holds within one queue. Two components that each
@@ -164,7 +183,8 @@ needs to hear.
 |---|---|
 | Core | ordered queue, no merging, repeated messages made distinct, per-message politeness, assertive ahead of the waiting polite ones, trimming, clearing, a hold checked against what a timer can keep, a per-message hold within the same bounds |
 | React | `useAnnouncer` with both regions, `AnnouncerProvider` and `useAnnounce` for one queue per page, a timer that drains the queue with each message's own hold, a drain that survives a re-run of the effect, one queue across a changed option |
-| Not yet | route-change announcements, a debug mode that logs what was announced |
+| Debug | the library logs nothing itself; `onDeliver` reports each announcement once, as it becomes current, which is where to log |
+| Not yet | route-change announcements |
 
 The queue is a plain class with no timers of its own, which is why the awkward
 cases are testable without waiting for anything.

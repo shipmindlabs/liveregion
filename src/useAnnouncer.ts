@@ -57,7 +57,7 @@ export type UseAnnouncer = {
 };
 
 export function useAnnouncer(options: QueueOptions = {}): UseAnnouncer {
-  const { clearAfterMs, deduplicate } = options;
+  const { clearAfterMs, deduplicate, onDeliver } = options;
   const [polite, setPolite] = useState("");
   const [assertive, setAssertive] = useState("");
 
@@ -68,7 +68,7 @@ export function useAnnouncer(options: QueueOptions = {}): UseAnnouncer {
   const [driver] = useState(
     () =>
       new Driver(
-        new Announcer({ clearAfterMs, deduplicate }),
+        new Announcer({ clearAfterMs, deduplicate, onDeliver }),
         (nextPolite, nextAssertive) => {
           setPolite(nextPolite);
           setAssertive(nextAssertive);

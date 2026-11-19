@@ -63,6 +63,21 @@ export type QueueOptions = {
    * has no effect on what is already queued or on what is announced next.
    */
   readonly deduplicate?: boolean;
+  /**
+   * Called with each announcement as it becomes current: once per message, in
+   * the order they are delivered, and never for one that `clear` dropped before
+   * its turn. This is where to log, because the queue itself logs nothing.
+   *
+   * Reporting at `announce` instead would name messages a later `clear` drops,
+   * and name a message queued behind five others long before anyone hears it.
+   *
+   * A callback that throws does not stall the queue: the message is current
+   * either way and the error is rethrown from a microtask, so it reaches the
+   * host unhandled rather than the caller of `announce`.
+   *
+   * Read when the queue is created, like `deduplicate`.
+   */
+  readonly onDeliver?: (announcement: Announcement) => void;
 };
 
 export const DEFAULT_CLEAR_MS = 1000;
@@ -106,13 +121,15 @@ export class Announcer {
   #current: Announcement | null = null;
   #counter = 0;
   #lastText = new Map<Politeness, string>();
-  #options: Required<QueueOptions>;
+  #options: Required<Omit<QueueOptions, "onDeliver">>;
+  #onDeliver: QueueOptions["onDeliver"];
 
   constructor(options: QueueOptions = {}) {
     this.#options = {
       clearAfterMs: checkHold("clearAfterMs", options.clearAfterMs ?? DEFAULT_CLEAR_MS),
       deduplicate: options.deduplicate ?? true,
     };
+    this.#onDeliver = options.onDeliver;
   }
 
   get clearAfterMs(): number {
@@ -192,9 +209,14 @@ export class Announcer {
    *
    * Called by the host on a timer. Keeping it explicit means the queue has no
    * timers of its own, and a test does not have to wait for one.
+   *
+   * This is also the one place a message is reported to `onDeliver`, after it
+   * is current: a message is current exactly once, and one that never becomes
+   * current was never heard.
    */
   advance(): Announcement | null {
     this.#current = this.#queue.shift() ?? null;
+    if (this.#current) this.#deliver(this.#current);
     return this.#current;
   }
 
@@ -203,6 +225,22 @@ export class Announcer {
     this.#queue = [];
     this.#current = null;
     return this;
+  }
+
+  /**
+   * A broken reporter must not stop the queue that was working: the message is
+   * current whatever the callback does, and the error is handed to the host as
+   * an unhandled one instead of surfacing from whoever called `announce`.
+   */
+  #deliver(announcement: Announcement): void {
+    if (!this.#onDeliver) return;
+    try {
+      this.#onDeliver(announcement);
+    } catch (error) {
+      queueMicrotask(() => {
+        throw error;
+      });
+    }
   }
 
   /**

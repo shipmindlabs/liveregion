@@ -111,6 +111,45 @@ test("each announcement carries its own politeness", () => {
   assert.equal(announcer.waiting[0]?.politeness, "assertive");
 });
 
+// Reporting at announce() would name messages that a later clear() drops, and
+// name a message long before anyone hears it.
+test("each announcement is reported once, as it becomes current", () => {
+  const log: string[] = [];
+  const announcer = new Announcer({ onDeliver: (a) => log.push(a.message) });
+
+  announcer.announce("A").announce("B").announce("C");
+  assert.deepEqual(log, ["A"], "the first message on an idle queue is reported too");
+
+  announcer.advance();
+  announcer.clear();
+  assert.deepEqual(log, ["A", "B"], "C never became current, so it was never heard");
+});
+
+test("a throwing onDeliver does not stall the queue", (t) => {
+  const scheduled: Array<() => void> = [];
+  t.mock.method(globalThis, "queueMicrotask", (callback: () => void) => {
+    scheduled.push(callback);
+  });
+
+  const failure = new Error("the logger is broken");
+  const announcer = new Announcer({
+    onDeliver: () => {
+      throw failure;
+    },
+  });
+
+  announcer.announce("A").announce("B");
+  assert.equal(announcer.current?.message, "A", "the message is current either way");
+  assert.equal(announcer.advance()?.message, "B", "and the next advance still works");
+
+  assert.equal(scheduled.length, 2, "one scheduled rethrow per failed report");
+  assert.throws(
+    () => scheduled[0]!(),
+    (error: unknown) => error === failure,
+    "the host sees the original error, unhandled",
+  );
+});
+
 // One hold does not fit both "Saved" and a three-sentence error.
 test("a message can carry its own hold", () => {
   const announcer = new Announcer();
