@@ -157,6 +157,47 @@ outer queue and the options passed to the inner one are ignored. A layout that
 provides and a route that provides again is the usual way a page ends up with
 two queues, and this is the way it does not.
 
+## Delivery
+
+The sections above are the quirks. This is the contract a caller can rely on
+once a message has been handed to `announce`, within one queue.
+
+**Order.** Messages are first-in-first-out within a politeness. An assertive
+message is placed after the last waiting assertive one and ahead of every
+waiting polite one, so the polite ones keep their order among themselves and
+only wait longer.
+
+**Hold.** The message showing in a region is never cut short. A later announce
+waits, however many arrive and whatever their politeness, and a changed
+`clearAfterMs` applies from the next message drained rather than to the hold
+already running. Each message is held for its own `holdMs`, or for the queue's
+`clearAfterMs` where it has none, and both are a finite 1 to 2147483647 ms —
+`MAX_CLEAR_MS`, which is the largest delay `setTimeout` keeps, because it holds
+its delay in a signed 32-bit integer of milliseconds and anything above that
+overflows and fires at once.
+
+**Blank.** An empty or whitespace-only message is never queued and arms no
+timer, so it cannot clear the region or shorten the hold of a real message that
+follows it.
+
+**Delivered.** A message counts as delivered when it becomes the current one:
+that is when its text reaches the region and when `onDeliver` is called with it,
+once per message, in delivery order. Being queued is not being delivered, and a
+message still waiting has no guarantee beyond its place in the order.
+
+**Dropped.** A queued message is dropped in exactly two ways: `clear()`, which
+drops both the waiting messages and the showing one, and unmounting the
+component that called `useAnnouncer` or the `AnnouncerProvider` that owns the
+queue, which takes the queue with whatever is still in it. Nothing else drops a
+message — not a re-render, not a changed option, not an effect that runs twice,
+and not an `onDeliver` that throws.
+
+The regions exist to meet WCAG 2.2 success criterion 4.1.3 Status Messages
+(Level AA): a status shown without moving focus has to be available to
+assistive technology as well. The criterion asks that the message be presented;
+the order and the hold above are what makes more than one of them presented in
+practice.
+
 ## The hiding style
 
 `VISUALLY_HIDDEN` is exported because this is the other common reason an
@@ -184,6 +225,7 @@ needs to hear.
 | Core | ordered queue, no merging, repeated messages made distinct, per-message politeness, assertive ahead of the waiting polite ones, trimming, clearing, a hold checked against what a timer can keep, a per-message hold within the same bounds |
 | React | `useAnnouncer` with both regions, `AnnouncerProvider` and `useAnnounce` for one queue per page, a timer that drains the queue with each message's own hold, a drain that survives a re-run of the effect, one queue across a changed option |
 | Debug | the library logs nothing itself; `onDeliver` reports each announcement once, as it becomes current, which is where to log |
+| Docs | the delivery contract: order, hold, what counts as delivered, and the two ways a queued message is dropped |
 | Not yet | route-change announcements |
 
 The queue is a plain class with no timers of its own, which is why the awkward

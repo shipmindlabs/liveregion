@@ -115,6 +115,10 @@ function checkHold(option: string, ms: number): number {
  * screen reader reads all of them. An assertive message describes something
  * that has gone wrong now, so it waits ahead of the polite ones rather than
  * behind them.
+ *
+ * The contract this makes to a caller — the order, the hold, what counts as
+ * delivered and the two ways a queued message is dropped — is the Delivery
+ * section of the README.
  */
 export class Announcer {
   #queue: Announcement[] = [];
